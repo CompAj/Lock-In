@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "dependencies": {
     "body-parser": "^2.2.0",
     "cloudflare": "^5.1.0",
