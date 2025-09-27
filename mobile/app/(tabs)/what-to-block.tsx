@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useColorScheme } from 'nativewind';
 import { resolvePalette } from '@/theme/colors';
 import { Switch } from '@/components/ui/switch';
+import { useRouter } from 'expo-router';
 
 type ToggleKey = 'youtubeShorts' | 'instagramReels' | 'socialMediaGeneral';
 
@@ -10,6 +11,7 @@ export default function WhatToBlockScreen() {
   const { colorScheme } = useColorScheme();
   const scheme = colorScheme === 'dark' ? 'dark' : 'light';
   const colors = resolvePalette(scheme);
+  const router = useRouter();
 
   const [toggles, setToggles] = useState<Record<ToggleKey, boolean>>({
     youtubeShorts: false,
@@ -27,51 +29,63 @@ export default function WhatToBlockScreen() {
   );
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-    >
-      <Text style={[styles.title, { color: colors.foreground }]}>What to block</Text>
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.tabBorder }]}>        
-        {items.map((item, index) => {
-          const isLast = index === items.length - 1;
-          return (
-            <View
-              key={item.key}
-              style={[
-                styles.row,
-                { borderBottomColor: colors.tabBorder },
-                isLast ? styles.rowLast : undefined,
-              ]}
-            >
-              <View style={styles.rowTextContainer}>
-                <Text style={[styles.rowLabel, { color: colors.foreground }]}>
-                  {item.label}
-                </Text>
-                {item.description ? (
-                  <Text style={[styles.rowDescription, { color: colors.tabInactive }]}>
-                    {item.description}
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <ScrollView style={styles.container}
+        contentContainerStyle={styles.content}
+      >
+        <Text style={[styles.title, { color: colors.foreground }]}>What to block</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.tabBorder }]}>        
+          {items.map((item, index) => {
+            const isLast = index === items.length - 1;
+            return (
+              <View
+                key={item.key}
+                style={[
+                  styles.row,
+                  { borderBottomColor: colors.tabBorder },
+                  isLast ? styles.rowLast : undefined,
+                ]}
+              >
+                <View style={styles.rowTextContainer}>
+                  <Text style={[styles.rowLabel, { color: colors.foreground }]}>
+                    {item.label}
                   </Text>
-                ) : null}
+                  {item.description ? (
+                    <Text style={[styles.rowDescription, { color: colors.tabInactive }]}>
+                      {item.description}
+                    </Text>
+                  ) : null}
+                </View>
+                <Switch
+                  value={toggles[item.key]}
+                  onValueChange={(v) =>
+                    setToggles((prev) => ({ ...prev, [item.key]: v }))
+                  }
+                  accessibilityLabel={`Toggle ${item.label}`}
+                />
               </View>
-              <Switch
-                value={toggles[item.key]}
-                onValueChange={(v) =>
-                  setToggles((prev) => ({ ...prev, [item.key]: v }))
-                }
-                accessibilityLabel={`Toggle ${item.label}`}
-              />
-            </View>
-          );
-        })}
-      </View>
-      <Text style={[styles.helper, { color: colors.tabInactive }]}>
-        These are only UI toggles for now. We’ll wire them to policies next.
-      </Text>
-    </ScrollView>
+            );
+          })}
+        </View>
+        <Text style={[styles.helper, { color: colors.tabInactive }]}>
+          These are only UI toggles for now. We’ll wire them to policies next.
+        </Text>
+      </ScrollView>
+      <Pressable
+        onPress={() => router.back()}
+        style={[styles.fabBack, { borderColor: colors.tabBorder, backgroundColor: colors.surface }]}
+        accessibilityLabel="Back to Home"
+      >
+        <Text style={[styles.fabIcon, { color: colors.foreground }]}>←</Text>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
@@ -113,6 +127,21 @@ const styles = StyleSheet.create({
   helper: {
     marginTop: 12,
     fontSize: 12,
+  },
+  fabBack: {
+    position: 'absolute',
+    left: 16,
+    bottom: 16,
+    height: 44,
+    width: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  fabIcon: {
+    fontSize: 20,
+    fontWeight: '600',
   },
 });
 
