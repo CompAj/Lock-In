@@ -3,7 +3,7 @@ import React, { useCallback } from 'react';
 import { resolvePalette } from '@/theme/colors';
 import { useColorScheme } from 'nativewind';
 
-export default function index() {
+export default function Index() {
   const { colorScheme, setColorScheme } = useColorScheme();
   const scheme = colorScheme === 'dark' ? 'dark' : 'light';
   const colors = resolvePalette(scheme);
