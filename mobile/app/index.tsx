@@ -9,7 +9,7 @@ export default function Index() {
         alignItems: "center",
       }}
     >
-      <Text className="color-red">Akib should Lock In</Text>
+      <Text>Edit app/index.tsx to edit this screen.</Text>
     </View>
   );
 }
