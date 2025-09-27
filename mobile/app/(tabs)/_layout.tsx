@@ -32,6 +32,12 @@ export default function TabLayout() {
                 //tabBarIcon: ({ color, size }) => <Ionicons name='home-outline' size={size} color={color} />
 
             }} />
+            <Tabs.Screen
+                name='what-to-block'
+                options={{
+                    title: 'What to block',
+                }}
+            />
         </Tabs>
     )
 }
