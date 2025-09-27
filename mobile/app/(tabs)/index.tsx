@@ -188,7 +188,7 @@ export default function HomeScreen() {
   }, [remainingSeconds, sessionActive]);
 
   const openBlocklist = useCallback(() => {
-    //router.push('/blocklist');
+    router.push('/what-to-block');
   }, [router]);
 
   return (
