@@ -6,9 +6,18 @@ import {
   Pressable,
   StyleSheet,
   Modal,
-  ScrollView,
+  TextInput,
+  Platform,
   useWindowDimensions,
+  TouchableWithoutFeedback,
+  Keyboard,
+  KeyboardAvoidingView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker, {
+  DateTimePickerAndroid,
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import { useColorScheme } from 'nativewind';
 import { resolvePalette } from '@/theme/colors';
 
@@ -16,27 +25,36 @@ const MIN_SECONDS = 5;
 const MAX_SECONDS = 12 * 60 * 60; // 12 hours
 const MAX_HOURS = Math.floor(MAX_SECONDS / 3600);
 
-const formatNumber = (value: number) => value.toString().padStart(2, '0');
-
 const clampSeconds = (seconds: number) => {
-  const clamped = Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, seconds));
-  return clamped;
+  return Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, seconds));
 };
 
 const toCountdown = (seconds: number) => {
   const safeSeconds = Math.max(0, seconds);
-  const hours = formatNumber(Math.floor(safeSeconds / 3600));
-  const minutes = formatNumber(Math.floor((safeSeconds % 3600) / 60));
-  const secs = formatNumber(safeSeconds % 60);
+  const hours = Math.floor(safeSeconds / 3600)
+    .toString()
+    .padStart(2, '0');
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+    .toString()
+    .padStart(2, '0');
+  const secs = (safeSeconds % 60).toString().padStart(2, '0');
   return `${hours}:${minutes}:${secs}`;
 };
 
-const splitSeconds = (seconds: number) => {
-  const safeSeconds = Math.max(0, seconds);
-  const hours = Math.floor(safeSeconds / 3600);
-  const minutes = Math.floor((safeSeconds % 3600) / 60);
-  const secs = safeSeconds % 60;
-  return { hours, minutes, secs };
+const formatShortTime = (date: Date | null) => {
+  if (!date) {
+    return 'Choose a time';
+  }
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
+const sanitizeNumber = (value: string, max: number) => {
+  const numeric = value.replace(/[^0-9]/g, '');
+  if (numeric.length === 0) {
+    return '0';
+  }
+  const parsed = Math.min(max, parseInt(numeric, 10));
+  return Number.isNaN(parsed) ? '0' : parsed.toString();
 };
 
 export default function HomeScreen() {
@@ -45,23 +63,16 @@ export default function HomeScreen() {
   const scheme = colorScheme === 'dark' ? 'dark' : 'light';
   const colors = resolvePalette(scheme);
   const { width: windowWidth } = useWindowDimensions();
-  const toggleSize = Math.min(windowWidth * 0.6, 220);
+  const toggleSize = Math.min(windowWidth * 0.4, 160);
 
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionLengthSeconds, setSessionLengthSeconds] = useState(50 * 60);
   const [remainingSeconds, setRemainingSeconds] = useState(sessionLengthSeconds);
   const [showPicker, setShowPicker] = useState(false);
-  const [{ hours: pickerHours, minutes: pickerMinutes, secs: pickerSeconds }, setPickerValues] =
-    useState(splitSeconds(50 * 60));
 
-  const hoursOptions = useMemo(
-    () => Array.from({ length: MAX_HOURS + 1 }, (_, index) => index),
-    [],
-  );
-  const minutesOptions = useMemo(
-    () => Array.from({ length: 60 }, (_, index) => index),
-    [],
-  );
+  const [manualHours, setManualHours] = useState('0');
+  const [manualMinutes, setManualMinutes] = useState('50');
+  const [selectedUntil, setSelectedUntil] = useState<Date | null>(null);
 
   const formattedDuration = useMemo(() => {
     const sourceSeconds = sessionActive ? remainingSeconds : sessionLengthSeconds;
@@ -75,38 +86,76 @@ export default function HomeScreen() {
         return false;
       }
 
-      if (sessionLengthSeconds <= 0) {
-        setSessionLengthSeconds(clampSeconds(60));
-        setRemainingSeconds(clampSeconds(60));
-      } else {
-        setRemainingSeconds(sessionLengthSeconds);
-      }
+      setRemainingSeconds(sessionLengthSeconds);
       return true;
     });
   }, [sessionLengthSeconds]);
 
-  const openDurationPicker = useCallback(() => {
+  const applyManualDuration = useCallback(() => {
+    const hours = Math.min(MAX_HOURS, parseInt(manualHours, 10) || 0);
+    const minutes = Math.min(59, parseInt(manualMinutes, 10) || 0);
+    const totalSeconds = clampSeconds(hours * 3600 + minutes * 60);
+
+    setSessionLengthSeconds(totalSeconds);
+    setRemainingSeconds(totalSeconds);
+    setSelectedUntil(null);
+    Keyboard.dismiss();
+  }, [manualHours, manualMinutes]);
+
+  const handleUntilSelection = useCallback(
+    (event: DateTimePickerEvent, date?: Date) => {
+      if (Platform.OS === 'ios') {
+        setShowPicker(false);
+      }
+
+      if (event.type === 'dismissed' || !date) {
+        return;
+      }
+
+      const now = new Date();
+      const candidate = new Date(now);
+      candidate.setHours(date.getHours(), date.getMinutes(), 0, 0);
+
+      if (candidate <= now) {
+        candidate.setDate(candidate.getDate() + 1);
+      }
+
+      const diffSeconds = Math.round((candidate.getTime() - now.getTime()) / 1000);
+      const duration = clampSeconds(diffSeconds);
+
+      setSelectedUntil(candidate);
+      setSessionLengthSeconds(duration);
+      setRemainingSeconds(duration);
+    },
+    [],
+  );
+
+  const openUntilPicker = useCallback(() => {
     if (sessionActive) {
       return;
     }
 
-    setPickerValues(splitSeconds(sessionLengthSeconds));
+    const defaultDate = selectedUntil ?? new Date(Date.now() + sessionLengthSeconds * 1000);
+
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: defaultDate,
+        mode: 'time',
+        is24Hour: false,
+        onChange: handleUntilSelection,
+      });
+      return;
+    }
+
     setShowPicker(true);
-  }, [sessionActive, sessionLengthSeconds]);
+  }, [handleUntilSelection, selectedUntil, sessionActive, sessionLengthSeconds]);
 
-  const confirmDuration = useCallback(() => {
-    const nextSeconds = clampSeconds(
-      pickerHours * 3600 + pickerMinutes * 60 + pickerSeconds,
-    );
-
-    setSessionLengthSeconds(nextSeconds);
-    setRemainingSeconds(nextSeconds);
-    setShowPicker(false);
-  }, [pickerHours, pickerMinutes, pickerSeconds]);
-
-  const cancelPicker = useCallback(() => {
-    setShowPicker(false);
-  }, []);
+  useEffect(() => {
+    const hours = Math.floor(sessionLengthSeconds / 3600);
+    const minutes = Math.floor((sessionLengthSeconds % 3600) / 60);
+    setManualHours(hours.toString());
+    setManualMinutes(minutes.toString());
+  }, [sessionLengthSeconds]);
 
   useEffect(() => {
     if (!sessionActive) {
@@ -139,159 +188,165 @@ export default function HomeScreen() {
   }, [remainingSeconds, sessionActive]);
 
   const openBlocklist = useCallback(() => {
-    router.push('/blocklist');
+    //router.push('/blocklist');
   }, [router]);
 
-  const renderPickerColumn = useCallback(
-    (
-      label: string,
-      options: number[],
-      value: number,
-      onSelect: (next: number) => void,
-    ) => (
-      <View style={styles.pickerColumn}>
-        <Text style={[styles.pickerColumnLabel, { color: colors.tabInactive }]}>{label}</Text>
-        <ScrollView
-          style={styles.pickerScroll}
-          contentContainerStyle={styles.pickerColumnContent}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          {options.map((option) => {
-            const selected = option === value;
-            return (
+  return (
+    <SafeAreaView style={[styles.flex, { backgroundColor: colors.surface }]}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 48 : 0}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={[styles.container, { backgroundColor: colors.surface }]}>
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: colors.foreground }]}>Lock-In Session</Text>
+              <Text style={[styles.subtitle, { color: colors.tabInactive }]}>
+                Keep distractions out while you study.
+              </Text>
+            </View>
+
+            <View style={styles.toggleSection}>
               <Pressable
-                key={`${label}-${option}`}
-                onPress={() => onSelect(option)}
+                onPress={toggleSession}
                 style={[
-                  styles.pickerItem,
-                  selected && {
-                    borderColor: colors.tabActive,
-                    backgroundColor: colors.surface,
+                  styles.toggleButton,
+                  {
+                    width: toggleSize,
+                    height: toggleSize,
+                    borderColor: sessionActive ? colors.tabActive : colors.tabBorder,
+                    backgroundColor: sessionActive ? colors.tabActive : colors.surface,
                   },
                 ]}
               >
                 <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: '700',
+                    color: sessionActive ? colors.background : colors.foreground,
+                  }}
+                >
+                  {formattedDuration}
+                </Text>
+              </Pressable>
+              <Text
+                style={{
+                  color: sessionActive ? colors.tabActive : colors.tabInactive,
+                  textAlign: 'center',
+                  maxWidth: 260,
+                }}
+              >
+                {sessionActive
+                  ? 'Blocking distractions for the duration of your session.'
+                  : 'Tap to begin a focus session and block distracting sites.'}
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.durationCard,
+                {
+                  borderColor: colors.tabBorder,
+                  backgroundColor: colors.background,
+                },
+              ]}
+            >
+              <Text style={[styles.sectionHeading, { color: colors.foreground }]}>Session length</Text>
+
+              <View style={styles.manualRow}>
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.inputLabel, { color: colors.tabInactive }]}>Hours</Text>
+                  <TextInput
+                    editable={!sessionActive}
+                    value={manualHours}
+                    onChangeText={(value) => setManualHours(sanitizeNumber(value, MAX_HOURS))}
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    onSubmitEditing={applyManualDuration}
+                    blurOnSubmit
+                    style={[styles.input, { color: colors.foreground, borderColor: colors.tabBorder }]}
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.inputLabel, { color: colors.tabInactive }]}>Minutes</Text>
+                  <TextInput
+                    editable={!sessionActive}
+                    value={manualMinutes}
+                    onChangeText={(value) => setManualMinutes(sanitizeNumber(value, 59))}
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    onSubmitEditing={applyManualDuration}
+                    blurOnSubmit
+                    style={[styles.input, { color: colors.foreground, borderColor: colors.tabBorder }]}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.actionsColumn}>
+                <Pressable
+                  disabled={sessionActive}
+                  onPress={applyManualDuration}
                   style={[
-                    styles.pickerItemLabel,
+                    styles.applyButton,
                     {
-                      color: selected ? colors.foreground : colors.tabInactive,
+                      backgroundColor: sessionActive ? colors.surface : colors.tabActive,
+                      borderColor: colors.tabBorder,
+                      opacity: sessionActive ? 0.6 : 1,
                     },
                   ]}
                 >
-                  {formatNumber(option)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-    ),
-    [colors.surface, colors.tabActive, colors.tabInactive, colors.foreground],
-  );
+                  <Text
+                    style={{
+                      color: sessionActive ? colors.tabInactive : colors.background,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Set duration
+                  </Text>
+                </Pressable>
 
-  return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor: colors.surface,
-        },
-      ]}
-    >
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Lock-In Session</Text>
-        <Text style={[styles.subtitle, { color: colors.tabInactive }]}>
-          Keep distractions out while you study.
-        </Text>
-      </View>
+                <Text style={[styles.inputLabel, { color: colors.tabInactive }]}>Or focus until</Text>
+                <Pressable
+                  disabled={sessionActive}
+                  onPress={openUntilPicker}
+                  style={[
+                    styles.untilButton,
+                    {
+                      borderColor: colors.tabBorder,
+                      backgroundColor: colors.surface,
+                      opacity: sessionActive ? 0.6 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: colors.foreground, fontSize: 16, fontWeight: '600' }}>
+                    {formatShortTime(selectedUntil)}
+                  </Text>
+                  <Text style={{ color: colors.tabInactive, fontSize: 12 }}>
+                    Until {toCountdown(sessionLengthSeconds)}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
 
-      <View style={styles.toggleSection}>
-        <Pressable
-          onPress={toggleSession}
-          style={[
-            styles.toggleButton,
-            {
-              width: toggleSize,
-              height: toggleSize,
-              borderColor: sessionActive ? colors.tabActive : colors.tabBorder,
-              backgroundColor: sessionActive ? colors.tabActive : colors.surface,
-            },
-          ]}
-        >
-          <Text
-            style={{
-              fontSize: 24,
-              fontWeight: '700',
-              color: sessionActive ? colors.background : colors.foreground,
-            }}
-          >
-            {sessionActive ? 'Session On' : 'Start Session'}
-          </Text>
-        </Pressable>
-        <Text
-          style={{
-            color: sessionActive ? colors.tabActive : colors.tabInactive,
-            textAlign: 'center',
-            maxWidth: 260,
-          }}
-        >
-          {sessionActive
-            ? 'Blocking distractions for the duration of your session.'
-            : 'Tap to begin a focus session and block distracting sites.'}
-        </Text>
-      </View>
-
-      <View
-        style={[
-          styles.durationCard,
-          {
-            borderColor: colors.tabBorder,
-            backgroundColor: colors.background,
-          },
-        ]}
-      >
-        <Text style={[styles.sectionHeading, { color: colors.foreground }]}>Session length</Text>
-        <Pressable
-          onPress={openDurationPicker}
-          disabled={sessionActive}
-          style={[styles.durationReadout, sessionActive && styles.disabledPicker]}
-        >
-          <Text style={[styles.durationLabel, { color: colors.foreground }]}>
-            {formattedDuration}
-          </Text>
-          <Text style={[styles.durationHint, { color: colors.tabInactive }]}>
-            {sessionActive
-              ? 'Counting down…'
-              : 'Tap to set hours, minutes, and seconds'}
-          </Text>
-        </Pressable>
-      </View>
-
-      <Pressable
-        onPress={openBlocklist}
-        style={[
-          styles.blocklistButton,
-          {
-            borderColor: colors.tabBorder,
-            backgroundColor: colors.surface,
-          },
-        ]}
-      >
-        <Text style={[styles.blocklistLabel, { color: colors.foreground }]}>
-          Choose what to block
-        </Text>
-      </Pressable>
-
-      {showPicker && (
-        <Modal
-          transparent
-          visible={showPicker}
-          animationType="fade"
-          statusBarTranslucent
-          onRequestClose={cancelPicker}
-        >
-          <Pressable style={styles.pickerBackdrop} onPress={cancelPicker}>
+            <Pressable
+              onPress={openBlocklist}
+              style={[
+                styles.blocklistButton,
+                {
+                  borderColor: colors.tabBorder,
+                  backgroundColor: colors.surface,
+                },
+              ]}
+            >
+              <Text style={[styles.blocklistLabel, { color: colors.foreground }]}>Choose what to block</Text>
+            </Pressable>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+      {Platform.OS === 'ios' && showPicker && (
+        <Modal transparent animationType="fade" statusBarTranslucent>
+          <Pressable style={styles.pickerBackdrop} onPress={() => setShowPicker(false)}>
             <Pressable
               style={[
                 styles.pickerContainer,
@@ -302,59 +357,36 @@ export default function HomeScreen() {
               ]}
               onPress={(event) => event.stopPropagation()}
             >
-              <Text style={[styles.pickerTitle, { color: colors.foreground }]}>
-                Set session duration
-              </Text>
-              <View style={styles.pickerColumns}>
-                {renderPickerColumn('Hours', hoursOptions, pickerHours, (next) =>
-                  setPickerValues((current) => ({ ...current, hours: next })),
-                )}
-                {renderPickerColumn('Minutes', minutesOptions, pickerMinutes, (next) =>
-                  setPickerValues((current) => ({ ...current, minutes: next })),
-                )}
-                {renderPickerColumn('Seconds', minutesOptions, pickerSeconds, (next) =>
-                  setPickerValues((current) => ({ ...current, secs: next })),
-                )}
-              </View>
-              <View style={styles.pickerActions}>
-                <Pressable
-                  style={[styles.pickerActionButton, { borderColor: colors.tabBorder }]}
-                  onPress={cancelPicker}
-                >
-                  <Text style={[styles.pickerActionLabel, { color: colors.tabInactive }]}>
-                    Cancel
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.pickerActionButton,
-                    {
-                      borderColor: colors.tabBorder,
-                      backgroundColor: colors.tabActive,
-                    },
-                  ]}
-                  onPress={confirmDuration}
-                >
-                  <Text style={[styles.pickerActionLabel, { color: colors.background }]}>
-                    Set
-                  </Text>
-                </Pressable>
-              </View>
+              <DateTimePicker
+                mode="time"
+                display="spinner"
+                value={selectedUntil ?? new Date(Date.now() + sessionLengthSeconds * 1000)}
+                onChange={handleUntilSelection}
+              />
+              <Pressable
+                style={[styles.pickerActionButton, { borderColor: colors.tabBorder }]}
+                onPress={() => setShowPicker(false)}
+              >
+                <Text style={[styles.pickerActionLabel, { color: colors.foreground }]}>Done</Text>
+              </Pressable>
             </Pressable>
           </Pressable>
         </Modal>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingVertical: 20,
     justifyContent: 'space-between',
-    gap: 24,
+    gap: 20,
   },
   header: {
     alignItems: 'center',
@@ -369,7 +401,7 @@ const styles = StyleSheet.create({
   },
   toggleSection: {
     alignItems: 'center',
-    gap: 20,
+    gap: 12,
   },
   toggleButton: {
     borderRadius: 9999,
@@ -378,7 +410,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   durationCard: {
-    padding: 24,
+    padding: 16,
     borderRadius: 24,
     borderWidth: 1,
     gap: 16,
@@ -388,23 +420,50 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
   },
-  durationReadout: {
-    alignItems: 'center',
+  manualRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  inputGroup: {
+    flex: 1,
     gap: 6,
   },
-  disabledPicker: {
-    opacity: 0.6,
-  },
-  durationLabel: {
-    fontSize: 40,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  durationHint: {
+  inputLabel: {
     fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  actionsColumn: {
+    alignSelf: 'stretch',
+    gap: 12,
+  },
+  applyButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignSelf: 'stretch',
+  },
+  untilButton: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 4,
+    alignSelf: 'stretch',
   },
   blocklistButton: {
-    paddingVertical: 18,
+    paddingVertical: 14,
     borderRadius: 16,
     borderWidth: 1,
     alignItems: 'center',
@@ -424,61 +483,13 @@ const styles = StyleSheet.create({
   pickerContainer: {
     width: '100%',
     maxWidth: 360,
-    maxHeight: '80%',
     borderRadius: 24,
     paddingVertical: 24,
     paddingHorizontal: 16,
     borderWidth: 1,
-    gap: 24,
-  },
-  pickerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  pickerColumns: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    maxHeight: 260,
-  },
-  pickerColumn: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 12,
-  },
-  pickerColumnLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  pickerColumnContent: {
-    gap: 8,
-    paddingBottom: 8,
-    alignItems: 'center',
-  },
-  pickerScroll: {
-    maxHeight: 220,
-  },
-  pickerItem: {
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    alignItems: 'center',
-  },
-  pickerItemLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  pickerActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+    gap: 16,
   },
   pickerActionButton: {
-    flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
