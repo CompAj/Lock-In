@@ -1,10 +1,11 @@
 import { Tabs } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { useColorScheme } from 'nativewind';
 import '@/global.css';
 import { resolvePalette } from '@/theme/colors';
 
 export default function TabLayout() {
-    const scheme = useColorScheme();
+    const { colorScheme } = useColorScheme();
+    const scheme = colorScheme === 'dark' ? 'dark' : 'light';
     const colors = resolvePalette(scheme);
     return (
         <Tabs

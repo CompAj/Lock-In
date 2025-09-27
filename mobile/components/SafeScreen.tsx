@@ -1,7 +1,8 @@
-import { View, StyleSheet, useColorScheme } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { ReactNode } from 'react';
 import { resolvePalette } from '@/theme/colors';
+import { useColorScheme } from 'nativewind';
 
 type SafeScreenProps = {
     children: ReactNode;
@@ -9,7 +10,8 @@ type SafeScreenProps = {
 
 export default function SafeScreen({ children }: SafeScreenProps) {
     const insets = useSafeAreaInsets();
-    const scheme = useColorScheme();
+    const { colorScheme } = useColorScheme();
+    const scheme = colorScheme === 'dark' ? 'dark' : 'light';
     const colors = resolvePalette(scheme);
 
     return (
