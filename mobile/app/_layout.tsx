@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { Stack } from "expo-router";
-import { ClerkProvider } from '@clerk/clerk-expo'
+import { Redirect, Stack } from "expo-router";
+import { ClerkProvider, useAuth } from '@clerk/clerk-expo'
 import { tokenCache } from '@clerk/clerk-expo/token-cache'
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
@@ -9,6 +9,16 @@ import { useColorScheme } from 'nativewind';
 import '@/global.css';
 import SafeScreen from '../components/SafeScreen';
 import { resolvePalette } from '@/theme/colors';
+
+function Gate() {
+	const { isLoaded, isSignedIn } = useAuth();
+
+	if (!isLoaded) return null;
+
+	if (!isSignedIn) return <Redirect href="/(auth)/sign_in" />;
+	return <Redirect href="/(tabs)" />;
+
+}
 
 export default function RootLayout() {
   const { colorScheme, setColorScheme } = useColorScheme();
@@ -37,8 +47,10 @@ export default function RootLayout() {
               contentStyle: { backgroundColor: colors.background },
             }}
           >
+			<Stack.Screen name="(auth)" />
             <Stack.Screen name='(tabs)' />
           </Stack>
+		  <Gate />
 		  </ClerkProvider>
         </SafeScreen>
       </GluestackUIProvider>
