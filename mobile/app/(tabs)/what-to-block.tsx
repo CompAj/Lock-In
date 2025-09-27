@@ -17,7 +17,7 @@ export default function WhatToBlockScreen() {
     socialMediaGeneral: false,
   });
 
-  const items: Array<{ key: ToggleKey; label: string; description?: string }> = useMemo(
+  const items: { key: ToggleKey; label: string; description?: string }[] = useMemo(
     () => [
       { key: 'youtubeShorts', label: 'YouTube Shorts' },
       { key: 'instagramReels', label: 'Instagram Reels' },
