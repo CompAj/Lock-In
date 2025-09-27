@@ -5,7 +5,7 @@ import { resolvePalette } from '@/theme/colors';
 import { Switch } from '@/components/ui/switch';
 import { useRouter } from 'expo-router';
 
-type ToggleKey = 'youtubeShorts' | 'instagramReels' | 'socialMediaGeneral';
+type ToggleKey = 'youtubeShorts' | 'instagramReels' | 'tiktok' | 'socialMediaGeneral';
 
 export default function WhatToBlockScreen() {
   const { colorScheme } = useColorScheme();
@@ -16,6 +16,7 @@ export default function WhatToBlockScreen() {
   const [toggles, setToggles] = useState<Record<ToggleKey, boolean>>({
     youtubeShorts: false,
     instagramReels: false,
+    tiktok: false,
     socialMediaGeneral: false,
   });
 
@@ -23,6 +24,7 @@ export default function WhatToBlockScreen() {
     () => [
       { key: 'youtubeShorts', label: 'YouTube Shorts' },
       { key: 'instagramReels', label: 'Instagram Reels' },
+      { key: 'tiktok', label: 'TikTok' },
       { key: 'socialMediaGeneral', label: 'Social media (general)' },
     ],
     []
