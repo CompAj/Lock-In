@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import '@/global.css';
 import { resolvePalette } from '@/theme/colors';
+import { SignOutButton } from '@/app/components/SignOutButton';
 
 export default function TabLayout() {
     const { colorScheme } = useColorScheme();
@@ -11,13 +12,19 @@ export default function TabLayout() {
         <Tabs
 
             screenOptions={{
-                headerShown: false,
+                headerShown: true,
                 tabBarStyle: {
                     display: 'none',
                 },
+                headerLeft: () => <SignOutButton />,
+                headerLeftContainerStyle: { paddingLeft: 8 },
+                headerStyle: {
+                    backgroundColor: colors.surface,
+                },
+                headerTintColor: colors.foreground,
                 headerTitleStyle: {
                     color: colors.foreground,
-                    fontWeight: 600,
+                    fontWeight: '600',
                 },
                 headerShadowVisible: false,
                 sceneStyle: {
