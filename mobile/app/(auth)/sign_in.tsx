@@ -1,7 +1,10 @@
 "use client"
 
 import React from "react"
-import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, StatusBar, Alert } from "react-native"
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, Alert } from "react-native"
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { useColorScheme } from 'nativewind'
+import { resolvePalette } from '@/theme/colors'
 import { useRouter } from "expo-router"
 import * as WebBrowser from "expo-web-browser"
 import * as Linking from "expo-linking"
@@ -13,6 +16,9 @@ export default function SignInScreen() {
   const router = useRouter()
   const [isLoading, setIsLoading] = React.useState(false)
   const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" })
+  const { colorScheme } = useColorScheme()
+  const scheme = colorScheme === 'dark' ? 'dark' : 'light'
+  const colors = resolvePalette(scheme)
 
   const onGoogleSignInPress = React.useCallback(async () => {
     setIsLoading(true)
@@ -35,13 +41,12 @@ export default function SignInScreen() {
   }, [startOAuthFlow, router])
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-950">
-      <StatusBar barStyle="light-content" backgroundColor="#020617" />
+    <SafeAreaView edges={['left','right']} style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
 
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingTop: 48, paddingBottom: 0, paddingHorizontal: 24 }}
         showsVerticalScrollIndicator={false}
-        className="px-6 pt-16 pb-8"
       >
         {/* Header Section */}
         <View className="flex-1 justify-center items-center">
