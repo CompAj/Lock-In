@@ -12,7 +12,9 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   KeyboardAvoidingView,
+  ScrollView,
   Linking,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker, {
@@ -25,6 +27,7 @@ import { resolvePalette } from "@/theme/colors";
 const MIN_SECONDS = 5;
 const MAX_SECONDS = 12 * 60 * 60; // 12 hours
 const MAX_HOURS = Math.floor(MAX_SECONDS / 3600);
+
 
 const clampSeconds = (seconds: number) => {
   return Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, seconds));
@@ -75,6 +78,19 @@ export default function HomeScreen() {
   const [manualHours, setManualHours] = useState("0");
   const [manualMinutes, setManualMinutes] = useState("50");
   const [selectedUntil, setSelectedUntil] = useState<Date | null>(null);
+
+  const handleDownloadCertificate = useCallback(async () => {
+    try {
+      const MOBILECONFIG_URL = process.env.EXPO_PUBLIC_MOBILECONFIG_URL || "http://localhost:3000/certificates/cloudflare.mobileconfig";
+      await Linking.openURL(MOBILECONFIG_URL);
+    } catch (error) {
+      console.error("Failed to open certificate download link", error);
+      Alert.alert(
+        "Certificate Download",
+        "We couldn't open the certificate download link. Please try again.",
+      );
+    }
+  }, []);
 
   const formattedDuration = useMemo(() => {
     const sourceSeconds = sessionActive
@@ -175,10 +191,6 @@ export default function HomeScreen() {
     }
   }, [sessionActive, sessionLengthSeconds]);
 
-  useEffect(() => {
-    const mobileConfigUrl = process.env.EXPO_PUBLIC_MOBILECONFIG_URL;
-    Linking.openURL(mobileConfigUrl ?? "https://example.com/health");
-  }, []);
 
   useEffect(() => {
     if (!sessionActive) {
@@ -216,203 +228,229 @@ export default function HomeScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 48 : 0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={[styles.container, { backgroundColor: colors.surface }]}>
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.foreground }]}>
-                Lock-In Session
-              </Text>
-              <Text style={[styles.subtitle, { color: colors.tabInactive }]}>
-                Keep distractions out while you study.
-              </Text>
-            </View>
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContainer,
+              { backgroundColor: colors.surface },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={[styles.container, { backgroundColor: colors.surface }]}>
+              <View style={styles.header}>
+                <Text style={[styles.title, { color: colors.foreground }]}>
+                  Lock-In Session
+                </Text>
+                <Text style={[styles.subtitle, { color: colors.tabInactive }]}>
+                  Keep distractions out while you study.
+                </Text>
+              </View>
 
-            <View style={styles.toggleSection}>
-              <Pressable
-                onPress={toggleSession}
+              <View style={styles.toggleSection}>
+                <Pressable
+                  onPress={toggleSession}
+                  style={[
+                    styles.toggleButton,
+                    {
+                      width: toggleSize,
+                      height: toggleSize,
+                      borderColor: sessionActive
+                        ? colors.tabActive
+                        : colors.tabBorder,
+                      backgroundColor: sessionActive
+                        ? colors.tabActive
+                        : colors.surface,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      fontSize: 24,
+                      fontWeight: "700",
+                      color: sessionActive
+                        ? colors.background
+                        : colors.foreground,
+                    }}
+                  >
+                    {formattedDuration}
+                  </Text>
+                </Pressable>
+                <Text
+                  style={{
+                    color: sessionActive ? colors.tabActive : colors.tabInactive,
+                    textAlign: "center",
+                    maxWidth: 260,
+                  }}
+                >
+                  {sessionActive
+                    ? "Blocking distractions for the duration of your session."
+                    : "Tap to begin a focus session and block distracting sites."}
+                </Text>
+              </View>
+
+              <View
                 style={[
-                  styles.toggleButton,
+                  styles.durationCard,
                   {
-                    width: toggleSize,
-                    height: toggleSize,
-                    borderColor: sessionActive
-                      ? colors.tabActive
-                      : colors.tabBorder,
-                    backgroundColor: sessionActive
-                      ? colors.tabActive
-                      : colors.surface,
+                    borderColor: colors.tabBorder,
+                    backgroundColor: colors.background,
                   },
                 ]}
               >
                 <Text
-                  style={{
-                    fontSize: 24,
-                    fontWeight: "700",
-                    color: sessionActive
-                      ? colors.background
-                      : colors.foreground,
-                  }}
+                  style={[styles.sectionHeading, { color: colors.foreground }]}
                 >
-                  {formattedDuration}
+                  Session length
                 </Text>
-              </Pressable>
-              <Text
-                style={{
-                  color: sessionActive ? colors.tabActive : colors.tabInactive,
-                  textAlign: "center",
-                  maxWidth: 260,
-                }}
-              >
-                {sessionActive
-                  ? "Blocking distractions for the duration of your session."
-                  : "Tap to begin a focus session and block distracting sites."}
-              </Text>
-            </View>
 
-            <View
-              style={[
-                styles.durationCard,
-                {
-                  borderColor: colors.tabBorder,
-                  backgroundColor: colors.background,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.sectionHeading, { color: colors.foreground }]}
-              >
-                Session length
-              </Text>
-
-              <View style={styles.manualRow}>
-                <View style={styles.inputGroup}>
-                  <Text
-                    style={[styles.inputLabel, { color: colors.tabInactive }]}
-                  >
-                    Hours
-                  </Text>
-                  <TextInput
-                    editable={!sessionActive}
-                    value={manualHours}
-                    onChangeText={(value) =>
-                      setManualHours(sanitizeNumber(value, MAX_HOURS))
-                    }
-                    keyboardType="number-pad"
-                    returnKeyType="done"
-                    onSubmitEditing={applyManualDuration}
-                    blurOnSubmit
-                    style={[
-                      styles.input,
-                      {
-                        color: colors.foreground,
-                        borderColor: colors.tabBorder,
-                      },
-                    ]}
-                  />
+                <View style={styles.manualRow}>
+                  <View style={styles.inputGroup}>
+                    <Text
+                      style={[styles.inputLabel, { color: colors.tabInactive }]}
+                    >
+                      Hours
+                    </Text>
+                    <TextInput
+                      editable={!sessionActive}
+                      value={manualHours}
+                      onChangeText={(value) =>
+                        setManualHours(sanitizeNumber(value, MAX_HOURS))
+                      }
+                      keyboardType="number-pad"
+                      returnKeyType="done"
+                      onSubmitEditing={applyManualDuration}
+                      blurOnSubmit
+                      style={[
+                        styles.input,
+                        {
+                          color: colors.foreground,
+                          borderColor: colors.tabBorder,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text
+                      style={[styles.inputLabel, { color: colors.tabInactive }]}
+                    >
+                      Minutes
+                    </Text>
+                    <TextInput
+                      editable={!sessionActive}
+                      value={manualMinutes}
+                      onChangeText={(value) =>
+                        setManualMinutes(sanitizeNumber(value, 59))
+                      }
+                      keyboardType="number-pad"
+                      returnKeyType="done"
+                      onSubmitEditing={applyManualDuration}
+                      blurOnSubmit
+                      style={[
+                        styles.input,
+                        {
+                          color: colors.foreground,
+                          borderColor: colors.tabBorder,
+                        },
+                      ]}
+                    />
+                  </View>
                 </View>
-                <View style={styles.inputGroup}>
+
+                <View style={styles.actionsColumn}>
+                  <Pressable
+                    disabled={sessionActive}
+                    onPress={applyManualDuration}
+                    style={[
+                      styles.applyButton,
+                      {
+                        backgroundColor: sessionActive
+                          ? colors.surface
+                          : colors.tabActive,
+                        borderColor: colors.tabBorder,
+                        opacity: sessionActive ? 0.6 : 1,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: sessionActive
+                          ? colors.tabInactive
+                          : colors.background,
+                        fontWeight: "600",
+                      }}
+                    >
+                      Set duration
+                    </Text>
+                  </Pressable>
+
                   <Text
                     style={[styles.inputLabel, { color: colors.tabInactive }]}
                   >
-                    Minutes
+                    Or focus until
                   </Text>
-                  <TextInput
-                    editable={!sessionActive}
-                    value={manualMinutes}
-                    onChangeText={(value) =>
-                      setManualMinutes(sanitizeNumber(value, 59))
-                    }
-                    keyboardType="number-pad"
-                    returnKeyType="done"
-                    onSubmitEditing={applyManualDuration}
-                    blurOnSubmit
+                  <Pressable
+                    disabled={sessionActive}
+                    onPress={openUntilPicker}
                     style={[
-                      styles.input,
+                      styles.untilButton,
                       {
-                        color: colors.foreground,
                         borderColor: colors.tabBorder,
+                        backgroundColor: colors.surface,
+                        opacity: sessionActive ? 0.6 : 1,
                       },
                     ]}
-                  />
+                  >
+                    <Text
+                      style={{
+                        color: colors.foreground,
+                        fontSize: 16,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {formatShortTime(selectedUntil)}
+                    </Text>
+                    <Text style={{ color: colors.tabInactive, fontSize: 12 }}>
+                      Until {toCountdown(sessionLengthSeconds)}
+                    </Text>
+                  </Pressable>
                 </View>
               </View>
 
-              <View style={styles.actionsColumn}>
+              <View style={styles.bottomActions}>
                 <Pressable
-                  disabled={sessionActive}
-                  onPress={applyManualDuration}
+                  onPress={openBlocklist}
                   style={[
-                    styles.applyButton,
-                    {
-                      backgroundColor: sessionActive
-                        ? colors.surface
-                        : colors.tabActive,
-                      borderColor: colors.tabBorder,
-                      opacity: sessionActive ? 0.6 : 1,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      color: sessionActive
-                        ? colors.tabInactive
-                        : colors.background,
-                      fontWeight: "600",
-                    }}
-                  >
-                    Set duration
-                  </Text>
-                </Pressable>
-
-                <Text
-                  style={[styles.inputLabel, { color: colors.tabInactive }]}
-                >
-                  Or focus until
-                </Text>
-                <Pressable
-                  disabled={sessionActive}
-                  onPress={openUntilPicker}
-                  style={[
-                    styles.untilButton,
+                    styles.blocklistButton,
                     {
                       borderColor: colors.tabBorder,
                       backgroundColor: colors.surface,
-                      opacity: sessionActive ? 0.6 : 1,
                     },
                   ]}
                 >
                   <Text
-                    style={{
-                      color: colors.foreground,
-                      fontSize: 16,
-                      fontWeight: "600",
-                    }}
+                    style={[styles.blocklistLabel, { color: colors.foreground }]}
                   >
-                    {formatShortTime(selectedUntil)}
+                    Choose what to block
                   </Text>
-                  <Text style={{ color: colors.tabInactive, fontSize: 12 }}>
-                    Until {toCountdown(sessionLengthSeconds)}
+                </Pressable>
+                <Pressable
+                  onPress={handleDownloadCertificate}
+                  style={[
+                    styles.blocklistButton,
+                    {
+                      borderColor: colors.tabBorder,
+                      backgroundColor: colors.surface,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.blocklistLabel, { color: colors.foreground }]}
+                  >
+                    Download network certificate
                   </Text>
                 </Pressable>
               </View>
             </View>
-
-            <Pressable
-              onPress={openBlocklist}
-              style={[
-                styles.blocklistButton,
-                {
-                  borderColor: colors.tabBorder,
-                  backgroundColor: colors.surface,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.blocklistLabel, { color: colors.foreground }]}
-              >
-                Choose what to block
-              </Text>
-            </Pressable>
-          </View>
+          </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
       {Platform.OS === "ios" && showPicker && (
@@ -467,6 +505,9 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
   },
   container: {
     flex: 1,
@@ -559,6 +600,10 @@ const styles = StyleSheet.create({
   blocklistLabel: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  bottomActions: {
+    gap: 12,
+    alignSelf: "stretch",
   },
   pickerBackdrop: {
     flex: 1,
