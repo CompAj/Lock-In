@@ -1,8 +1,9 @@
 import { useClerk } from '@clerk/clerk-expo'
 import * as Linking from 'expo-linking'
-import { Text, TouchableOpacity } from 'react-native'
+import { TouchableOpacity } from 'react-native'
 import { useColorScheme } from 'nativewind'
 import { resolvePalette } from '@/theme/colors'
+import { Feather } from '@expo/vector-icons'
 
 export const SignOutButton = () => {
   // Use `useClerk()` to access the `signOut()` function
@@ -26,9 +27,10 @@ export const SignOutButton = () => {
       onPress={handleSignOut}
       accessibilityRole="button"
       accessibilityLabel="Sign out"
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       style={{ paddingHorizontal: 8, paddingVertical: 4 }}
     >
-      <Text style={{ color: colors.foreground, fontWeight: '600' }}>Sign out</Text>
+      <Feather name="log-out" size={20} color={colors.foreground} />
     </TouchableOpacity>
   )
 }
