@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -12,14 +12,15 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   KeyboardAvoidingView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+  Linking,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
-import { useColorScheme } from 'nativewind';
-import { resolvePalette } from '@/theme/colors';
+} from "@react-native-community/datetimepicker";
+import { useColorScheme } from "nativewind";
+import { resolvePalette } from "@/theme/colors";
 
 const MIN_SECONDS = 5;
 const MAX_SECONDS = 12 * 60 * 60; // 12 hours
@@ -33,49 +34,52 @@ const toCountdown = (seconds: number) => {
   const safeSeconds = Math.max(0, seconds);
   const hours = Math.floor(safeSeconds / 3600)
     .toString()
-    .padStart(2, '0');
+    .padStart(2, "0");
   const minutes = Math.floor((safeSeconds % 3600) / 60)
     .toString()
-    .padStart(2, '0');
-  const secs = (safeSeconds % 60).toString().padStart(2, '0');
+    .padStart(2, "0");
+  const secs = (safeSeconds % 60).toString().padStart(2, "0");
   return `${hours}:${minutes}:${secs}`;
 };
 
 const formatShortTime = (date: Date | null) => {
   if (!date) {
-    return 'Choose a time';
+    return "Choose a time";
   }
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 };
 
 const sanitizeNumber = (value: string, max: number) => {
-  const numeric = value.replace(/[^0-9]/g, '');
+  const numeric = value.replace(/[^0-9]/g, "");
   if (numeric.length === 0) {
-    return '0';
+    return "0";
   }
   const parsed = Math.min(max, parseInt(numeric, 10));
-  return Number.isNaN(parsed) ? '0' : parsed.toString();
+  return Number.isNaN(parsed) ? "0" : parsed.toString();
 };
 
 export default function HomeScreen() {
   const router = useRouter();
   const { colorScheme } = useColorScheme();
-  const scheme = colorScheme === 'dark' ? 'dark' : 'light';
+  const scheme = colorScheme === "dark" ? "dark" : "light";
   const colors = resolvePalette(scheme);
   const { width: windowWidth } = useWindowDimensions();
   const toggleSize = Math.min(windowWidth * 0.4, 160);
 
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionLengthSeconds, setSessionLengthSeconds] = useState(50 * 60);
-  const [remainingSeconds, setRemainingSeconds] = useState(sessionLengthSeconds);
+  const [remainingSeconds, setRemainingSeconds] =
+    useState(sessionLengthSeconds);
   const [showPicker, setShowPicker] = useState(false);
 
-  const [manualHours, setManualHours] = useState('0');
-  const [manualMinutes, setManualMinutes] = useState('50');
+  const [manualHours, setManualHours] = useState("0");
+  const [manualMinutes, setManualMinutes] = useState("50");
   const [selectedUntil, setSelectedUntil] = useState<Date | null>(null);
 
   const formattedDuration = useMemo(() => {
-    const sourceSeconds = sessionActive ? remainingSeconds : sessionLengthSeconds;
+    const sourceSeconds = sessionActive
+      ? remainingSeconds
+      : sessionLengthSeconds;
     return toCountdown(sourceSeconds);
   }, [remainingSeconds, sessionActive, sessionLengthSeconds]);
 
@@ -104,11 +108,11 @@ export default function HomeScreen() {
 
   const handleUntilSelection = useCallback(
     (event: DateTimePickerEvent, date?: Date) => {
-      if (Platform.OS === 'ios') {
+      if (Platform.OS === "ios") {
         setShowPicker(false);
       }
 
-      if (event.type === 'dismissed' || !date) {
+      if (event.type === "dismissed" || !date) {
         return;
       }
 
@@ -120,14 +124,16 @@ export default function HomeScreen() {
         candidate.setDate(candidate.getDate() + 1);
       }
 
-      const diffSeconds = Math.round((candidate.getTime() - now.getTime()) / 1000);
+      const diffSeconds = Math.round(
+        (candidate.getTime() - now.getTime()) / 1000
+      );
       const duration = clampSeconds(diffSeconds);
 
       setSelectedUntil(candidate);
       setSessionLengthSeconds(duration);
       setRemainingSeconds(duration);
     },
-    [],
+    []
   );
 
   const openUntilPicker = useCallback(() => {
@@ -135,12 +141,13 @@ export default function HomeScreen() {
       return;
     }
 
-    const defaultDate = selectedUntil ?? new Date(Date.now() + sessionLengthSeconds * 1000);
+    const defaultDate =
+      selectedUntil ?? new Date(Date.now() + sessionLengthSeconds * 1000);
 
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       DateTimePickerAndroid.open({
         value: defaultDate,
-        mode: 'time',
+        mode: "time",
         is24Hour: false,
         onChange: handleUntilSelection,
       });
@@ -148,7 +155,12 @@ export default function HomeScreen() {
     }
 
     setShowPicker(true);
-  }, [handleUntilSelection, selectedUntil, sessionActive, sessionLengthSeconds]);
+  }, [
+    handleUntilSelection,
+    selectedUntil,
+    sessionActive,
+    sessionLengthSeconds,
+  ]);
 
   useEffect(() => {
     const hours = Math.floor(sessionLengthSeconds / 3600);
@@ -162,6 +174,11 @@ export default function HomeScreen() {
       setRemainingSeconds(sessionLengthSeconds);
     }
   }, [sessionActive, sessionLengthSeconds]);
+
+  useEffect(() => {
+    const mobileConfigUrl = process.env.EXPO_PUBLIC_MOBILECONFIG_URL;
+    Linking.openURL(mobileConfigUrl ?? "https://example.com/health");
+  }, []);
 
   useEffect(() => {
     if (!sessionActive) {
@@ -188,20 +205,22 @@ export default function HomeScreen() {
   }, [remainingSeconds, sessionActive]);
 
   const openBlocklist = useCallback(() => {
-    router.push('/what-to-block');
+    router.push("/what-to-block");
   }, [router]);
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.surface }]}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 48 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 48 : 0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={[styles.container, { backgroundColor: colors.surface }]}>
             <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.foreground }]}>Lock-In Session</Text>
+              <Text style={[styles.title, { color: colors.foreground }]}>
+                Lock-In Session
+              </Text>
               <Text style={[styles.subtitle, { color: colors.tabInactive }]}>
                 Keep distractions out while you study.
               </Text>
@@ -215,16 +234,22 @@ export default function HomeScreen() {
                   {
                     width: toggleSize,
                     height: toggleSize,
-                    borderColor: sessionActive ? colors.tabActive : colors.tabBorder,
-                    backgroundColor: sessionActive ? colors.tabActive : colors.surface,
+                    borderColor: sessionActive
+                      ? colors.tabActive
+                      : colors.tabBorder,
+                    backgroundColor: sessionActive
+                      ? colors.tabActive
+                      : colors.surface,
                   },
                 ]}
               >
                 <Text
                   style={{
                     fontSize: 24,
-                    fontWeight: '700',
-                    color: sessionActive ? colors.background : colors.foreground,
+                    fontWeight: "700",
+                    color: sessionActive
+                      ? colors.background
+                      : colors.foreground,
                   }}
                 >
                   {formattedDuration}
@@ -233,13 +258,13 @@ export default function HomeScreen() {
               <Text
                 style={{
                   color: sessionActive ? colors.tabActive : colors.tabInactive,
-                  textAlign: 'center',
+                  textAlign: "center",
                   maxWidth: 260,
                 }}
               >
                 {sessionActive
-                  ? 'Blocking distractions for the duration of your session.'
-                  : 'Tap to begin a focus session and block distracting sites.'}
+                  ? "Blocking distractions for the duration of your session."
+                  : "Tap to begin a focus session and block distracting sites."}
               </Text>
             </View>
 
@@ -252,33 +277,61 @@ export default function HomeScreen() {
                 },
               ]}
             >
-              <Text style={[styles.sectionHeading, { color: colors.foreground }]}>Session length</Text>
+              <Text
+                style={[styles.sectionHeading, { color: colors.foreground }]}
+              >
+                Session length
+              </Text>
 
               <View style={styles.manualRow}>
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.tabInactive }]}>Hours</Text>
+                  <Text
+                    style={[styles.inputLabel, { color: colors.tabInactive }]}
+                  >
+                    Hours
+                  </Text>
                   <TextInput
                     editable={!sessionActive}
                     value={manualHours}
-                    onChangeText={(value) => setManualHours(sanitizeNumber(value, MAX_HOURS))}
+                    onChangeText={(value) =>
+                      setManualHours(sanitizeNumber(value, MAX_HOURS))
+                    }
                     keyboardType="number-pad"
                     returnKeyType="done"
                     onSubmitEditing={applyManualDuration}
                     blurOnSubmit
-                    style={[styles.input, { color: colors.foreground, borderColor: colors.tabBorder }]}
+                    style={[
+                      styles.input,
+                      {
+                        color: colors.foreground,
+                        borderColor: colors.tabBorder,
+                      },
+                    ]}
                   />
                 </View>
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.tabInactive }]}>Minutes</Text>
+                  <Text
+                    style={[styles.inputLabel, { color: colors.tabInactive }]}
+                  >
+                    Minutes
+                  </Text>
                   <TextInput
                     editable={!sessionActive}
                     value={manualMinutes}
-                    onChangeText={(value) => setManualMinutes(sanitizeNumber(value, 59))}
+                    onChangeText={(value) =>
+                      setManualMinutes(sanitizeNumber(value, 59))
+                    }
                     keyboardType="number-pad"
                     returnKeyType="done"
                     onSubmitEditing={applyManualDuration}
                     blurOnSubmit
-                    style={[styles.input, { color: colors.foreground, borderColor: colors.tabBorder }]}
+                    style={[
+                      styles.input,
+                      {
+                        color: colors.foreground,
+                        borderColor: colors.tabBorder,
+                      },
+                    ]}
                   />
                 </View>
               </View>
@@ -290,7 +343,9 @@ export default function HomeScreen() {
                   style={[
                     styles.applyButton,
                     {
-                      backgroundColor: sessionActive ? colors.surface : colors.tabActive,
+                      backgroundColor: sessionActive
+                        ? colors.surface
+                        : colors.tabActive,
                       borderColor: colors.tabBorder,
                       opacity: sessionActive ? 0.6 : 1,
                     },
@@ -298,15 +353,21 @@ export default function HomeScreen() {
                 >
                   <Text
                     style={{
-                      color: sessionActive ? colors.tabInactive : colors.background,
-                      fontWeight: '600',
+                      color: sessionActive
+                        ? colors.tabInactive
+                        : colors.background,
+                      fontWeight: "600",
                     }}
                   >
                     Set duration
                   </Text>
                 </Pressable>
 
-                <Text style={[styles.inputLabel, { color: colors.tabInactive }]}>Or focus until</Text>
+                <Text
+                  style={[styles.inputLabel, { color: colors.tabInactive }]}
+                >
+                  Or focus until
+                </Text>
                 <Pressable
                   disabled={sessionActive}
                   onPress={openUntilPicker}
@@ -319,7 +380,13 @@ export default function HomeScreen() {
                     },
                   ]}
                 >
-                  <Text style={{ color: colors.foreground, fontSize: 16, fontWeight: '600' }}>
+                  <Text
+                    style={{
+                      color: colors.foreground,
+                      fontSize: 16,
+                      fontWeight: "600",
+                    }}
+                  >
                     {formatShortTime(selectedUntil)}
                   </Text>
                   <Text style={{ color: colors.tabInactive, fontSize: 12 }}>
@@ -339,14 +406,21 @@ export default function HomeScreen() {
                 },
               ]}
             >
-              <Text style={[styles.blocklistLabel, { color: colors.foreground }]}>Choose what to block</Text>
+              <Text
+                style={[styles.blocklistLabel, { color: colors.foreground }]}
+              >
+                Choose what to block
+              </Text>
             </Pressable>
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
-      {Platform.OS === 'ios' && showPicker && (
+      {Platform.OS === "ios" && showPicker && (
         <Modal transparent animationType="fade" statusBarTranslucent>
-          <Pressable style={styles.pickerBackdrop} onPress={() => setShowPicker(false)}>
+          <Pressable
+            style={styles.pickerBackdrop}
+            onPress={() => setShowPicker(false)}
+          >
             <Pressable
               style={[
                 styles.pickerContainer,
@@ -360,14 +434,27 @@ export default function HomeScreen() {
               <DateTimePicker
                 mode="time"
                 display="spinner"
-                value={selectedUntil ?? new Date(Date.now() + sessionLengthSeconds * 1000)}
+                value={
+                  selectedUntil ??
+                  new Date(Date.now() + sessionLengthSeconds * 1000)
+                }
                 onChange={handleUntilSelection}
               />
               <Pressable
-                style={[styles.pickerActionButton, { borderColor: colors.tabBorder }]}
+                style={[
+                  styles.pickerActionButton,
+                  { borderColor: colors.tabBorder },
+                ]}
                 onPress={() => setShowPicker(false)}
               >
-                <Text style={[styles.pickerActionLabel, { color: colors.foreground }]}>Done</Text>
+                <Text
+                  style={[
+                    styles.pickerActionLabel,
+                    { color: colors.foreground },
+                  ]}
+                >
+                  Done
+                </Text>
               </Pressable>
             </Pressable>
           </Pressable>
@@ -385,28 +472,28 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     paddingVertical: 20,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     gap: 20,
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
   },
   toggleSection: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: 12,
   },
   toggleButton: {
     borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
   },
   durationCard: {
@@ -414,14 +501,14 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     gap: 16,
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
   },
   sectionHeading: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   manualRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   inputGroup: {
@@ -430,8 +517,8 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    textTransform: "uppercase",
     letterSpacing: 0.6,
   },
   input: {
@@ -440,19 +527,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   actionsColumn: {
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
     gap: 12,
   },
   applyButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
   },
   untilButton: {
     borderWidth: 1,
@@ -460,28 +547,28 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     gap: 4,
-    alignSelf: 'stretch',
+    alignSelf: "stretch",
   },
   blocklistButton: {
     paddingVertical: 14,
     borderRadius: 16,
     borderWidth: 1,
-    alignItems: 'center',
-    alignSelf: 'stretch',
+    alignItems: "center",
+    alignSelf: "stretch",
   },
   blocklistLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   pickerBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 24,
   },
   pickerContainer: {
-    width: '100%',
+    width: "100%",
     maxWidth: 360,
     borderRadius: 24,
     paddingVertical: 24,
@@ -493,10 +580,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   pickerActionLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
