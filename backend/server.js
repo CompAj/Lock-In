@@ -75,6 +75,7 @@ app.post("/create-access-policy", async (req, res) => {
 app.post("/create-block-policy", async (req, res) => {
   try {
     const { email } = req.body ?? {};
+    console.log(email);
     if (!email) return res.status(400).json({ error: "email required" });
 
     const rule = await client.zeroTrust.gateway.rules.create({

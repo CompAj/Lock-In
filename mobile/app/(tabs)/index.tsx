@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 import {
   View,
   Text,
@@ -27,7 +28,6 @@ import { resolvePalette } from "@/theme/colors";
 const MIN_SECONDS = 5;
 const MAX_SECONDS = 12 * 60 * 60; // 12 hours
 const MAX_HOURS = Math.floor(MAX_SECONDS / 3600);
-
 
 const clampSeconds = (seconds: number) => {
   return Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, seconds));
@@ -62,6 +62,7 @@ const sanitizeNumber = (value: string, max: number) => {
 };
 
 export default function HomeScreen() {
+  const { user } = useUser();
   const router = useRouter();
   const { colorScheme } = useColorScheme();
   const scheme = colorScheme === "dark" ? "dark" : "light";
@@ -81,13 +82,15 @@ export default function HomeScreen() {
 
   const handleDownloadCertificate = useCallback(async () => {
     try {
-      const MOBILECONFIG_URL = process.env.EXPO_PUBLIC_MOBILECONFIG_URL || "http://localhost:3000/certificates/cloudflare.mobileconfig";
+      const MOBILECONFIG_URL =
+        process.env.EXPO_PUBLIC_MOBILECONFIG_URL ||
+        "http://localhost:3000/certificates/cloudflare.mobileconfig";
       await Linking.openURL(MOBILECONFIG_URL);
     } catch (error) {
       console.error("Failed to open certificate download link", error);
       Alert.alert(
         "Certificate Download",
-        "We couldn't open the certificate download link. Please try again.",
+        "We couldn't open the certificate download link. Please try again."
       );
     }
   }, []);
@@ -100,6 +103,21 @@ export default function HomeScreen() {
   }, [remainingSeconds, sessionActive, sessionLengthSeconds]);
 
   const toggleSession = useCallback(() => {
+    const create_policy = async () => {
+      try {
+        const baseUrl =
+          process.env.EXPO_PUBLIC_SERVER_URL ?? "http://localhost:3000";
+
+        await fetch(`${baseUrl}/create-block-policy`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user?.emailAddresses[0].emailAddress }),
+        });
+      } catch (error) {
+        console.error("Failed to create block policy", error);
+      }
+    };
+    create_policy();
     setSessionActive((prev) => {
       if (prev) {
         setRemainingSeconds(sessionLengthSeconds);
@@ -191,7 +209,6 @@ export default function HomeScreen() {
     }
   }, [sessionActive, sessionLengthSeconds]);
 
-
   useEffect(() => {
     if (!sessionActive) {
       return;
@@ -235,7 +252,9 @@ export default function HomeScreen() {
             ]}
             showsVerticalScrollIndicator={false}
           >
-            <View style={[styles.container, { backgroundColor: colors.surface }]}>
+            <View
+              style={[styles.container, { backgroundColor: colors.surface }]}
+            >
               <View style={styles.header}>
                 <Text style={[styles.title, { color: colors.foreground }]}>
                   Lock-In Session
@@ -276,7 +295,9 @@ export default function HomeScreen() {
                 </Pressable>
                 <Text
                   style={{
-                    color: sessionActive ? colors.tabActive : colors.tabInactive,
+                    color: sessionActive
+                      ? colors.tabActive
+                      : colors.tabInactive,
                     textAlign: "center",
                     maxWidth: 260,
                   }}
@@ -427,7 +448,10 @@ export default function HomeScreen() {
                   ]}
                 >
                   <Text
-                    style={[styles.blocklistLabel, { color: colors.foreground }]}
+                    style={[
+                      styles.blocklistLabel,
+                      { color: colors.foreground },
+                    ]}
                   >
                     Choose what to block
                   </Text>
@@ -443,7 +467,10 @@ export default function HomeScreen() {
                   ]}
                 >
                   <Text
-                    style={[styles.blocklistLabel, { color: colors.foreground }]}
+                    style={[
+                      styles.blocklistLabel,
+                      { color: colors.foreground },
+                    ]}
                   >
                     Download network certificate
                   </Text>
