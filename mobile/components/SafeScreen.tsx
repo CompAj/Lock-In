@@ -19,10 +19,10 @@ export default function SafeScreen({ children }: SafeScreenProps) {
             style={[
                 styles.container,
                 {
-                    paddingTop: insets.top,
+                    // Avoid adding global safe-area padding so router headers/layouts
+                    // are not shifted. Individual screens should handle their own
+                    // safe-area needs via SafeAreaView.
                     paddingBottom: insets.bottom,
-                    paddingLeft: insets.left,
-                    paddingRight: insets.right,
                     backgroundColor: colors.background,
                 },
             ]}
