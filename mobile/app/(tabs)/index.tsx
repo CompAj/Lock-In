@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
-import { useUser } from "@clerk/clerk-expo";
+import { useClerk, useUser } from "@clerk/clerk-expo";
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { useColorScheme } from "nativewind";
 import { resolvePalette } from "@/theme/colors";
+import { useBlockPreferences } from "@/context/BlockPreferencesContext";
 
 const MIN_SECONDS = 5;
 const MAX_SECONDS = 12 * 60 * 60; // 12 hours
@@ -61,14 +62,38 @@ const sanitizeNumber = (value: string, max: number) => {
   return Number.isNaN(parsed) ? "0" : parsed.toString();
 };
 
+const create_acccess_policy = async (user: any) => {
+  try {
+    const response = await fetch(
+      process.env.EXPO_PUBLIC_SERVER_URL + "/create-access-policy",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: `${user?.emailAddresses?.[0]?.emailAddress}`,
+        }),
+      }
+    );
+    const data = await response.json();
+    console.log("Access policy created:", data);
+  } catch (error) {
+    console.error("Error creating access policy:", error);
+  }
+};
+
 export default function HomeScreen() {
   const { user } = useUser();
+  const { signOut } = useClerk();
   const router = useRouter();
   const { colorScheme } = useColorScheme();
   const scheme = colorScheme === "dark" ? "dark" : "light";
   const colors = resolvePalette(scheme);
   const { width: windowWidth } = useWindowDimensions();
   const toggleSize = Math.min(windowWidth * 0.4, 160);
+  const { toggles } = useBlockPreferences();
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress;
 
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionLengthSeconds, setSessionLengthSeconds] = useState(50 * 60);
@@ -95,6 +120,16 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOut();
+      router.replace("/(auth)/sign_in");
+    } catch (error) {
+      console.error("Sign out failed", error);
+      Alert.alert("Sign out", "We couldn't sign you out. Please try again." );
+    }
+  }, [router, signOut]);
+
   const formattedDuration = useMemo(() => {
     const sourceSeconds = sessionActive
       ? remainingSeconds
@@ -102,22 +137,33 @@ export default function HomeScreen() {
     return toCountdown(sourceSeconds);
   }, [remainingSeconds, sessionActive, sessionLengthSeconds]);
 
-  const toggleSession = useCallback(() => {
-    const create_policy = async () => {
-      try {
-        const baseUrl =
-          process.env.EXPO_PUBLIC_SERVER_URL ?? "http://localhost:3000";
+  const createPolicy = useCallback(async () => {
+    try {
+      const baseUrl =
+        process.env.EXPO_PUBLIC_SERVER_URL ?? "http://localhost:3000";
 
-        await fetch(`${baseUrl}/create-block-policy`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: user?.emailAddresses[0].emailAddress }),
-        });
-      } catch (error) {
-        console.error("Failed to create block policy", error);
-      }
-    };
-    create_policy();
+      await fetch(`${baseUrl}/create-block-policy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: userEmail,
+          blocks: toggles,
+          duration: sessionActive ? remainingSeconds : sessionLengthSeconds,
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to create block policy", error);
+    }
+  }, [
+    toggles,
+    userEmail,
+    sessionActive,
+    remainingSeconds,
+    sessionLengthSeconds,
+  ]);
+
+  const toggleSession = useCallback(() => {
+    void createPolicy();
     setSessionActive((prev) => {
       if (prev) {
         setRemainingSeconds(sessionLengthSeconds);
@@ -127,7 +173,7 @@ export default function HomeScreen() {
       setRemainingSeconds(sessionLengthSeconds);
       return true;
     });
-  }, [sessionLengthSeconds]);
+  }, [createPolicy, sessionLengthSeconds]);
 
   const applyManualDuration = useCallback(() => {
     const hours = Math.min(MAX_HOURS, parseInt(manualHours, 10) || 0);
@@ -197,6 +243,12 @@ export default function HomeScreen() {
   ]);
 
   useEffect(() => {
+    (async () => {
+      await create_acccess_policy(user);
+    })();
+  }, []);
+
+  useEffect(() => {
     const hours = Math.floor(sessionLengthSeconds / 3600);
     const minutes = Math.floor((sessionLengthSeconds % 3600) / 60);
     setManualHours(hours.toString());
@@ -256,9 +308,27 @@ export default function HomeScreen() {
               style={[styles.container, { backgroundColor: colors.surface }]}
             >
               <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.foreground }]}>
-                  Lock-In Session
-                </Text>
+                <View style={styles.headerRow}>
+                  <Text style={[styles.title, { color: colors.foreground }]}>
+                    Lock-In Session
+                  </Text>
+                  <Pressable
+                    onPress={handleSignOut}
+                    style={[
+                      styles.logoutButton,
+                      {
+                        borderColor: colors.tabBorder,
+                        backgroundColor: colors.surface,
+                      },
+                    ]}
+                    accessibilityLabel="Sign out"
+                  >
+                    <Text
+                      style={[styles.logoutLabel, { color: colors.tabActive }]}>
+                      Sign out
+                    </Text>
+                  </Pressable>
+                </View>
                 <Text style={[styles.subtitle, { color: colors.tabInactive }]}>
                   Keep distractions out while you study.
                 </Text>
@@ -545,11 +615,20 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
+    gap: 8,
+    alignSelf: "stretch",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    alignSelf: "stretch",
   },
   title: {
     fontSize: 28,
     fontWeight: "700",
-    marginBottom: 8,
+    marginBottom: 0,
   },
   subtitle: {
     fontSize: 16,
@@ -557,6 +636,16 @@ const styles = StyleSheet.create({
   toggleSection: {
     alignItems: "center",
     gap: 12,
+  },
+  logoutButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  logoutLabel: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   toggleButton: {
     borderRadius: 9999,

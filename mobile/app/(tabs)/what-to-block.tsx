@@ -1,24 +1,17 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useColorScheme } from 'nativewind';
 import { resolvePalette } from '@/theme/colors';
 import { Switch } from '@/components/ui/switch';
 import { useRouter } from 'expo-router';
-
-type ToggleKey = 'youtubeShorts' | 'instagramReels' | 'tiktok' | 'socialMediaGeneral';
+import { useBlockPreferences, type ToggleKey } from '@/context/BlockPreferencesContext';
 
 export default function WhatToBlockScreen() {
   const { colorScheme } = useColorScheme();
   const scheme = colorScheme === 'dark' ? 'dark' : 'light';
   const colors = resolvePalette(scheme);
   const router = useRouter();
-
-  const [toggles, setToggles] = useState<Record<ToggleKey, boolean>>({
-    youtubeShorts: false,
-    instagramReels: false,
-    tiktok: false,
-    socialMediaGeneral: false,
-  });
+  const { toggles, setToggle } = useBlockPreferences();
 
   const items: { key: ToggleKey; label: string; description?: string }[] = useMemo(
     () => [
@@ -60,9 +53,7 @@ export default function WhatToBlockScreen() {
                 </View>
                 <Switch
                   value={toggles[item.key]}
-                  onValueChange={(v) =>
-                    setToggles((prev) => ({ ...prev, [item.key]: v }))
-                  }
+                  onValueChange={(value) => setToggle(item.key, value)}
                   accessibilityLabel={`Toggle ${item.label}`}
                 />
               </View>
@@ -146,5 +137,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
 

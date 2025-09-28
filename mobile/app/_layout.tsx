@@ -9,6 +9,7 @@ import { useColorScheme } from 'nativewind';
 import '@/global.css';
 import SafeScreen from '../components/SafeScreen';
 import { resolvePalette } from '@/theme/colors';
+import { BlockPreferencesProvider } from '@/context/BlockPreferencesContext';
 
 function Gate() {
 	const { isLoaded, isSignedIn } = useAuth();
@@ -38,6 +39,7 @@ export default function RootLayout() {
         backgroundColor={colors.background}
       />
       <GluestackUIProvider mode={mode}>
+        <BlockPreferencesProvider>
         <SafeScreen>
 		<ClerkProvider tokenCache={tokenCache}>
 
@@ -53,6 +55,7 @@ export default function RootLayout() {
 		  <Gate />
 		  </ClerkProvider>
         </SafeScreen>
+        </BlockPreferencesProvider>
       </GluestackUIProvider>
     </SafeAreaProvider>
   );
