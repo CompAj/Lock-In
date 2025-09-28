@@ -192,7 +192,7 @@ export default function HomeScreen() {
   }, [router]);
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: colors.surface }]}>
+    <SafeAreaView edges={['left','right']} style={[styles.flex, { backgroundColor: colors.surface }]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
